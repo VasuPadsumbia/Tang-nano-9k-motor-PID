@@ -1,0 +1,165 @@
+================================================================================
+  FPGA PID MOTOR CONTROLLER - Quick Start Guide
+================================================================================
+
+HARDWARE SETUP:
+1. Connect Tang Nano 9K to PC via JTAG USB cable
+2. Connect serial terminal (USB UART) to pins RX(17) and TX(18)
+3. Configure serial terminal: 115200 baud, 8 data bits, 1 stop bit, no parity
+
+INITIAL MODE SELECTION:
+================================================================================
+
+On startup, the system waits for user input to select mode:
+
+  LED2 will FLASH rapidly = Waiting for mode selection
+
+Send ONE of these commands:
+  H  = Hardware Mode (uses actual motor feedback from pin)
+  S  = Simulation Mode (uses simulated motor model with LED3 visualization)
+
+Example: Type "H" and press Enter for Hardware Mode
+
+================================================================================
+SIMULATION MODE (No Physical Motor Required):
+================================================================================
+
+1. Send: S (and press Enter)
+2. LED2 stops flashing, LED3 becomes your visual motor indicator
+3. LED3 brightness represents motor speed/position
+
+4. Test auto-tuning:
+   Command: T (press Enter)
+   - LED1 flashes while tuning (330ms duration)
+   - Tuning adjusts PID gains automatically
+   - After completion, LED1 stays ON
+
+5. Set motor setpoint:
+   Command: S8000 (press Enter)
+   - Sets target position to 0x8000 (mid-range 32768)
+   - Motor simulation will move toward setpoint
+   - LED3 shows proportional brightness
+
+6. Monitor telemetry (automatic):
+   Serial output every 100ms shows:
+   SET:xxxx FB:xxxx PID:xxxx ERR:xxxx KP:xxxx KI:xxxx KD:xxxx T:xx S
+   
+   Example output:
+   SET:8000 FB:4000 PID:1000 ERR:4000 KP:0100 KI:0020 KD:0080 T:00 S
+
+================================================================================
+HARDWARE MODE (With Real Motor):
+================================================================================
+
+1. Connect motor output to PWM_OUT(25) and MOTOR_DIR(26) pins
+2. Send: H (and press Enter)
+3. LED2 shows heartbeat (slow blink)
+
+4. Run auto-tuning:
+   Command: T (press Enter)
+   - System applies step input to measure motor response
+   - Calculates optimal PID gains (Kp, Ki, Kd)
+   - Takes 330ms to complete
+   - LED1 flashes during tuning, stays ON after completion
+
+5. Set motor speed:
+   Command: S8000 (press Enter)
+   - Sets target speed to 0x8000 (mid-range)
+   - Motor will accelerate/decelerate to target
+
+6. Monitor performance via serial telemetry (auto, every 100ms)
+
+================================================================================
+SERIAL COMMANDS:
+================================================================================
+
+K<HEX>    Set Kp (proportional gain)
+          Example: K0100  -> Kp = 0x0100 = 1.0 (scaled by 256)
+          Range: 0x0000 to 0xFFFF
+
+I<HEX>    Set Ki (integral gain)
+          Example: I0020  -> Ki = 0x0020 = 0.125 (scaled by 256)
+          Range: 0x0000 to 0xFFFF
+
+D<HEX>    Set Kd (derivative gain)
+          Example: D0080  -> Kd = 0x0080 = 0.5 (scaled by 256)
+          Range: 0x0000 to 0xFFFF
+
+S<HEX>    Set setpoint (target position/speed)
+          Example: S4000  -> Setpoint = 0x4000 = 16384
+          Range: 0x0000 to 0xFFFF
+
+T         Trigger auto-tuning
+          - Applies step response test
+          - Calculates optimal gains using Ziegler-Nichols method
+          - Duration: ~330ms
+          - LED1 flashes, stays ON when complete
+
+H         Select Hardware Mode (startup only)
+          Must be first command after power-on
+
+S         Select Simulation Mode (startup only)
+          Must be first command after power-on
+
+================================================================================
+LED STATUS INDICATORS:
+================================================================================
+
+LED1:  Tuning Status
+   OFF        = No tuning active (using manual gains)
+   FLASHING   = Auto-tuning in progress
+   ON         = Tuning complete (using auto-tuned gains)
+
+LED2:  System Status
+   FLASHING   = Waiting for mode selection (H or S)
+   SLOW BLINK = System running normally
+   
+LED3:  Motor Output (Simulation Mode Only)
+   OFF/DIM    = Motor stopped or moving backward
+   BRIGHT     = Motor running forward at full speed
+   VARIES     = Motor PWM pulse width indicator
+
+================================================================================
+PID GAIN SCALING:
+================================================================================
+
+All PID gains use 8.8 fixed-point format (scaled by 256):
+  
+  Actual Gain = Register Value / 256
+
+Examples:
+  0x0100 (256) = 1.0
+  0x0080 (128) = 0.5
+  0x0040 (64)  = 0.25
+  0x0200 (512) = 2.0
+
+Default Gains:
+  Kp = 0x0100 (1.0)
+  Ki = 0x0020 (0.125)
+  Kd = 0x0080 (0.5)
+
+Auto-tuned gains will be different based on motor characteristics.
+
+================================================================================
+TROUBLESHOOTING:
+================================================================================
+
+Q: System won't start, no LED activity
+A: Check power supply, USB connection, and JTAG debugger connection
+
+Q: LED2 keeps flashing, no response to commands
+A: System waiting for H or S command. Send "S" or "H" first.
+
+Q: No serial output appears
+A: Check baud rate (115200), check RX/TX connections, verify USB UART adapter
+
+Q: Auto-tuning takes too long or seems stuck
+A: Normal - auto-tuning takes ~330ms. Verify motor can rotate freely.
+
+Q: PID gains not changing after sending K/I/D commands
+A: Gains locked by auto-tuning. Turn off tuning mode by sending manual gains.
+
+Q: Motor not responding to setpoint changes
+A: Check MOTOR_DIR and PWM_OUT connections, verify hardware mode active.
+
+================================================================================
