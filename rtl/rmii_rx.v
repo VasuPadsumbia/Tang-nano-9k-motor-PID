@@ -1,72 +1,96 @@
 module rmii_rx(
-  input  wire       clk50,
-  input  wire       rst_n,
-  input  wire [1:0] rxd,
-  input  wire       crs_dv,
+    input  wire       clk50,
+    input  wire       rst,
+    input  wire       crs_dv,
+    input  wire [1:0] rxd,
+    input  wire       rx_er,
 
-  output reg  [7:0] rx_byte,
-  output reg        rx_byte_valid,
-  output reg        frame_active
+    output reg        sof,
+    output reg        eof,
+    output reg        vld,
+    output reg [7:0]  byte_out
 );
 
-  reg [1:0] sym_cnt;
-  reg [7:0] sh;
-  reg       locked;      // locked to byte boundary after preamble
-  reg [2:0] pre_cnt;     // count 0x55 bytes
+    reg dv_d;
 
-  // Assemble bytes LSB-first (RMII sends 2-bit symbols, LSB-first)
-  wire [7:0] assembled = { rxd, sh[7:2] };
+    // 2-bit -> 8-bit assembly
+    reg [1:0] p2;
+    reg [7:0] sh;
+    reg [7:0] assembled;
 
-  always @(posedge clk50) begin
-    if (!rst_n) begin
-      sym_cnt       <= 2'd0;
-      sh            <= 8'd0;
-      rx_byte       <= 8'd0;
-      rx_byte_valid <= 1'b0;
-      frame_active  <= 1'b0;
-      locked        <= 1'b0;
-      pre_cnt       <= 3'd0;
-    end else begin
-      rx_byte_valid <= 1'b0;
+    // preamble stripper
+    localparam ST_IDLE = 2'd0;
+    localparam ST_PREAM = 2'd1;
+    localparam ST_DATA = 2'd2;
+    reg [1:0] st;
+    reg       sof_pending;
 
-      if (!crs_dv) begin
-        // end of frame / idle
-        sym_cnt      <= 2'd0;
-        frame_active <= 1'b0;
-        locked       <= 1'b0;
-        pre_cnt      <= 3'd0;
-      end else begin
-        frame_active <= 1'b1;
+    always @(posedge clk50) begin
+        if (rst) begin
+            dv_d <= 1'b0;
+            p2 <= 2'd0;
+            sh <= 8'd0;
 
-        // shift in symbols
-        sh <= { rxd, sh[7:2] };
+            sof <= 1'b0;
+            eof <= 1'b0;
+            vld <= 1'b0;
+            byte_out <= 8'd0;
 
-        if (sym_cnt == 2'd3) begin
-          sym_cnt <= 2'd0;
-
-          // We have a complete byte candidate
-          if (!locked) begin
-            // Hunt for 7x 0x55 then 0xD5
-            if (assembled == 8'h55) begin
-              if (pre_cnt != 3'd7) pre_cnt <= pre_cnt + 3'd1;
-            end else if (assembled == 8'hD5 && pre_cnt >= 3'd5) begin
-              // Seen enough preamble then SFD: lock
-              locked   <= 1'b1;
-              pre_cnt  <= 3'd0;
-              // Do not output SFD byte to upper layer
-            end else begin
-              pre_cnt <= 3'd0;
-            end
-          end else begin
-            // Locked: output bytes to parser
-            rx_byte       <= assembled;
-            rx_byte_valid <= 1'b1;
-          end
-
+            st <= ST_IDLE;
+            sof_pending <= 1'b0;
         end else begin
-          sym_cnt <= sym_cnt + 2'd1;
+            sof <= 1'b0;
+            eof <= 1'b0;
+            vld <= 1'b0;
+
+            dv_d <= crs_dv;
+
+            if (!dv_d && crs_dv) begin
+                // new frame begins (preamble starts)
+                st <= ST_PREAM;
+                p2 <= 2'd0;
+                sof_pending <= 1'b0;
+            end
+
+            if (dv_d && !crs_dv) begin
+                // end of frame
+                eof <= 1'b1;
+                st <= ST_IDLE;
+                p2 <= 2'd0;
+                sof_pending <= 1'b0;
+            end
+
+            if (crs_dv) begin
+                // Assemble 1 byte from 4 cycles
+                case (p2)
+                    2'd0: begin sh[1:0] <= rxd; p2 <= 2'd1; end
+                    2'd1: begin sh[3:2] <= rxd; p2 <= 2'd2; end
+                    2'd2: begin sh[5:4] <= rxd; p2 <= 2'd3; end
+                    2'd3: begin
+                        sh[7:6] <= rxd;
+                        p2 <= 2'd0;
+                        assembled <= {rxd, sh[5:0]};
+
+                        // Now process the assembled byte
+                        if (st == ST_PREAM) begin
+                            // ignore 0x55 bytes, wait for SFD 0xD5
+                            if ({rxd, sh[5:0]} == 8'hD5) begin
+                                st <= ST_DATA;
+                                sof_pending <= 1'b1; // next DATA byte is sof
+                            end
+                        end else if (st == ST_DATA) begin
+                            // output real frame bytes (dest mac starts here)
+                            vld <= 1'b1;
+                            byte_out <= {rxd, sh[5:0]};
+                            if (sof_pending) begin
+                                sof <= 1'b1;
+                                sof_pending <= 1'b0;
+                            end
+                        end
+                    end
+                endcase
+            end
         end
-      end
     end
-  end
+
 endmodule
