@@ -1,0 +1,20 @@
+# ====================================================================
+# requirements.txt  (top-level – FPGA toolchain and simulation tools)
+# Project: Tang Nano 9K PID Motor Controller over Ethernet
+# ====================================================================
+#
+# These are the HOST MACHINE tools required to build and simulate.
+# Install with: pip install -r requirements.txt
+# (or follow the APIO install method in docs/ide_setup.md)
+#
+# NOTE: PC dashboard dependencies are in pc/requirements.txt
+#       and must be installed in the pc/.venv virtual environment.
+#       Run: cd pc && bash setup_venv.sh
+
+# APIO – open-source FPGA build tool for Tang Nano 9K
+# Wraps: Yosys (synthesis), nextpnr-gowin (P&R), openFPGALoader (flash)
+apio==0.9.*
+
+# Icarus Verilog Python wrapper (optional – for running testbenches via Python)
+# If you prefer to call iverilog directly, skip this.
+# iverilog must still be installed via: sudo apt install iverilog

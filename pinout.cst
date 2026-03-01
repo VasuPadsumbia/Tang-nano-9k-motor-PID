@@ -1,99 +1,104 @@
-IO_LOC  "CLK" 52;
-IO_PORT "CLK" IO_TYPE=LVCMOS33 PULL_MODE=UP;
-// IO_LOC  "LED1" 10;
-// IO_PORT "LED1" IO_TYPE=LVCMOS33;
-// 
-// IO_LOC  "RX" 17;
-// IO_PORT "RX" IO_TYPE=LVCMOS33;
-// 
-// IO_LOC  "TX" 18;
-// IO_PORT "TX" IO_TYPE=LVCMOS33;
-// 
-
-
-IO_LOC  "LED2" 13;
-IO_PORT "LED2" IO_TYPE=LVCMOS33;
-IO_LOC  "LED3" 15;
-IO_PORT "LED3" IO_TYPE=LVCMOS33;
-// 
-// IO_LOC  "PWM_OUT" 25;
-// IO_PORT "PWM_OUT" IO_TYPE=LVCMOS33;
-// 
-// IO_LOC  "MOTOR_DIR" 26;
-// IO_PORT "MOTOR_DIR" IO_TYPE=LVCMOS33;
+// =============================================================================
+// Pin Constraint File – Tang Nano 9K PID Motor Controller over Ethernet
+// File: pinout.cst
+//
+// Hardware:
+//   Board  : Sipeed Tang Nano 9K (Gowin GW1NR-9)
+//   PHY    : LAN8720 RMII module
+//   Motor  : External H-bridge (L298N / DRV8833 / TB6612)
+//   Encoder: Quadrature (A/B lines) 3.3V compatible
+// =============================================================================
 
 // ============================================================
-// Tang Nano 9K + LAN8720 RMII
-// REF_CLK must be on a clock-capable pin (GCLK)
+// System Clock (27 MHz onboard crystal – kept but unused in RTL)
 // ============================================================
+IO_LOC  "CLK"  52;
+IO_PORT "CLK"  IO_TYPE=LVCMOS33 PULL_MODE=UP;
 
-// --------------------
-// RMII REF_CLK (50MHz)
-// LAN8720 INT/REFCLK -> FPGA CLK50
-// --------------------
-IO_LOC  "CLK50"           38;              // IOB31B (GCLK_4 region)
+// ============================================================
+// RMII REF_CLK – 50 MHz from LAN8720 INT/REFCLK output
+// MUST be on a global clock-capable pin (GCLK region)
+// ============================================================
+IO_LOC  "CLK50"           38;
 IO_PORT "CLK50"           IO_TYPE=LVCMOS33;
 
-// --------------------
-// RMII TX
-// --------------------
-IO_LOC  "RMII_TXD[0]"     77;              // IOT37A
-IO_PORT "RMII_TXD[0]"     IO_TYPE=LVCMOS33;
+// ============================================================
+// RMII TX (FPGA → LAN8720)
+// ============================================================
+IO_LOC  "RMII_TXD[0]"    77;
+IO_PORT "RMII_TXD[0]"    IO_TYPE=LVCMOS33;
 
-IO_LOC  "RMII_TXD[1]"     76;              // IOT37B
-IO_PORT "RMII_TXD[1]"     IO_TYPE=LVCMOS33;
+IO_LOC  "RMII_TXD[1]"    76;
+IO_PORT "RMII_TXD[1]"    IO_TYPE=LVCMOS33;
 
-IO_LOC  "RMII_TX_EN"      75;              // IOT38A
-IO_PORT "RMII_TX_EN"      IO_TYPE=LVCMOS33;
+IO_LOC  "RMII_TX_EN"     75;
+IO_PORT "RMII_TX_EN"     IO_TYPE=LVCMOS33;
 
-// --------------------
-// RMII RX
-// --------------------
-IO_LOC  "RMII_RXD[0]"     73;              // IOT39A
-IO_PORT "RMII_RXD[0]"     IO_TYPE=LVCMOS33;
+// ============================================================
+// RMII RX (LAN8720 → FPGA)
+// ============================================================
+IO_LOC  "RMII_RXD[0]"    73;
+IO_PORT "RMII_RXD[0]"    IO_TYPE=LVCMOS33;
 
-IO_LOC  "RMII_RXD[1]"     72;              // IOT39B
-IO_PORT "RMII_RXD[1]"     IO_TYPE=LVCMOS33;
+IO_LOC  "RMII_RXD[1]"    72;
+IO_PORT "RMII_RXD[1]"    IO_TYPE=LVCMOS33;
 
-IO_LOC  "RMII_CRS_DV"     71;              // IOT41A
-IO_PORT "RMII_CRS_DV"     IO_TYPE=LVCMOS33;
+IO_LOC  "RMII_CRS_DV"    71;
+IO_PORT "RMII_CRS_DV"    IO_TYPE=LVCMOS33;
 
-// Optional RX error (only if you actually wired LAN8720 RXER)
-// If not used in RTL, you can remove these two lines.
-IO_LOC  "RMII_RX_ER"      74;              // IOT38B (picked a nearby free pin)
-IO_PORT "RMII_RX_ER"      IO_TYPE=LVCMOS33;
+IO_LOC  "RMII_RX_ER"     74;
+IO_PORT "RMII_RX_ER"     IO_TYPE=LVCMOS33;
 
-// --------------------
-// MDIO management bus
-// --------------------
-IO_LOC  "RMII_MDC"        68;              // IOT42A
-IO_PORT "RMII_MDC"        IO_TYPE=LVCMOS33;
+// ============================================================
+// MDIO management bus (MDC driven LOW = PHY in strap mode)
+// ============================================================
+IO_LOC  "RMII_MDC"       68;
+IO_PORT "RMII_MDC"       IO_TYPE=LVCMOS33;
 
-IO_LOC  "RMII_MDIO"       69;              // IOT42B
-IO_PORT "RMII_MDIO"       IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC  "RMII_MDIO"      69;
+IO_PORT "RMII_MDIO"      IO_TYPE=LVCMOS33 PULL_MODE=UP;
 
-// --------------------
-// Onboard LED (choose one you actually use in RTL: LED1)
-// From your pinout image, common LED pins are IO ports in right side,
-// but you already used LED1 in RTL. Here we map LED1 to IOT0A (pin 85)
-// Change if your tutorial uses a different LED pin.
-// --------------------
-IO_LOC  "LED1"            11;              // IOT8A (example LED pin)
-IO_PORT "LED1"            IO_TYPE=LVCMOS33;
+// ============================================================
+// Motor Control outputs
+//   PWM_OUT   → H-bridge EN/PWM input
+//   MOTOR_DIR → H-bridge IN1 (IN2 = ~MOTOR_DIR, invert externally
+//               or use two separate outputs if H-bridge needs it)
+// ============================================================
+IO_LOC  "PWM_OUT"        25;
+IO_PORT "PWM_OUT"        IO_TYPE=LVCMOS33;
 
-// --------------------
-// Buttons (2 buttons on board: S1/S2)
-// These pin numbers depend on board routing.
-// If you know your button pins, replace them here.
-// For now, I map to two common GPIO pins you can physically access.
-// --------------------
-IO_LOC  "BTN1"            3;              // IOT5A (example)
-IO_PORT "BTN1"            IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC  "MOTOR_DIR"      26;
+IO_PORT "MOTOR_DIR"      IO_TYPE=LVCMOS33;
 
-IO_LOC  "BTN2"            4;              // IOT6A (example)
-IO_PORT "BTN2"            IO_TYPE=LVCMOS33 PULL_MODE=UP;
+// ============================================================
+// Quadrature Encoder inputs
+//   Use 100 Ω series resistors to protect FPGA IO.
+//   If encoder is open-collector, add 10 kΩ pull-up to 3.3 V.
+// ============================================================
+IO_LOC  "ENC_A"          27;
+IO_PORT "ENC_A"          IO_TYPE=LVCMOS33 PULL_MODE=UP;
 
-// Optional: use BTN1 as external reset if you want
-// If your RTL has RST_N port, uncomment these and wire BTN1 -> reset logic
-// IO_LOC  "RST_N"         63;
-// IO_PORT "RST_N"         IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC  "ENC_B"          28;
+IO_PORT "ENC_B"          IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// ============================================================
+// Onboard LEDs (active LOW on Tang Nano 9K)
+//   LED1 = heartbeat    (pin 11)
+//   LED2 = TX activity  (pin 13)
+//   LED3 = PID active   (pin 15)
+// ============================================================
+IO_LOC  "LED1"           11;
+IO_PORT "LED1"           IO_TYPE=LVCMOS33;
+
+IO_LOC  "LED2"           13;
+IO_PORT "LED2"           IO_TYPE=LVCMOS33;
+
+IO_LOC  "LED3"           15;
+IO_PORT "LED3"           IO_TYPE=LVCMOS33;
+
+// ============================================================
+// Onboard Buttons (active LOW, internal pull-up)
+//   BTN1 = reset button (S1)
+// ============================================================
+IO_LOC  "BTN1"           3;
+IO_PORT "BTN1"           IO_TYPE=LVCMOS33 PULL_MODE=UP;
