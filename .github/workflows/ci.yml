@@ -1,0 +1,90 @@
+name: CI Build and Test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # ---------------------------------------------------------
+  # Job 1: Run Icarus Verilog Simulations
+  # ---------------------------------------------------------
+  simulate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Icarus Verilog
+        run: sudo apt-get update && sudo apt-get install -y iverilog
+
+      - name: Create data directory
+        run: mkdir -p data
+
+      - name: Run PID Unit Test
+        run: |
+          iverilog -g2012 -o data/sim_pid tb/tb_pid_controller.v rtl/motor/pid_controller.v
+          vvp data/sim_pid | tee data/pid_test.log
+          grep "Total PASS: 3  FAIL: 0" data/pid_test.log
+
+      - name: Run PWM Unit Test
+        run: |
+          iverilog -g2012 -o data/sim_pwm tb/tb_pwm_gen.v rtl/motor/pwm_gen.v
+          vvp data/sim_pwm | tee data/pwm_test.log
+          grep "Total PASS: 5  FAIL: 0" data/pwm_test.log
+
+      - name: Run Top-Level Integration Test
+        run: |
+          iverilog -g2012 -Wall -o data/sim_top \
+            tb/tb_top.v rtl/top.v \
+            rtl/sys/clk_div.v \
+            rtl/motor/pid_controller.v rtl/motor/motor_bridge.v \
+            rtl/motor/pwm_gen.v rtl/motor/encoder_reader.v \
+            rtl/comm/rmii_rx.v rtl/comm/rmii_tx.v rtl/comm/eth_crc32.v \
+            rtl/comm/eth_rx_parser.v rtl/comm/eth_tx_builder.v \
+            rtl/comm/arp_handler.v rtl/comm/udp_ctrl_rx.v rtl/comm/udp_telem_tx.v
+          vvp data/sim_top | tee data/top_test.log
+          grep "ALL TESTS PASSED" data/top_test.log
+
+      - name: Upload Test Output wave files
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: simulation-waves
+          path: data/*.vcd
+          retention-days: 7
+
+
+  # ---------------------------------------------------------
+  # Job 2: Run FPGA Bitstream Synthesis (APIO / Gowin)
+  # ---------------------------------------------------------
+  apio-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install APIO
+        run: |
+          pip install -r requirements.txt
+          apio install system gowin
+
+      - name: Synthetic Verification (Lint)
+        run: apio verify
+
+      - name: Build Bitstream
+        run: apio build
+
+      - name: Upload Bitstream
+        uses: actions/upload-artifact@v4
+        with:
+          name: hardware-bitstream
+          path: hardware.fs
+          retention-days: 7
